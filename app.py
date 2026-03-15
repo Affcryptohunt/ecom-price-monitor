@@ -2,70 +2,87 @@ import streamlit as st
 import os
 import requests
 import json
+import re
 
-# Try to load local .env only if NOT running in the cloud
+# 1. SETUP & SECRETS
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     pass 
 
-# Streamlit handles the secrets automatically from the 'Settings' menu we discussed
+# These pull from Streamlit Cloud "Secrets" automatically
 BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
 CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
+DB_FILE = 'monitor_list.json'
 
-def get_price(url, selector=None):
-    # If no selector, assume it's a Shopify store and use the .js trick
-    target_url = f"{url}.js" if not selector else url
-    proxy_url = f"http://api.scraperapi.com?api_key={API_KEY}&url={target_url}"
-    
+# 2. THE ENGINE (Firewall Bypass)
+def get_price(url):
+    # Using the Jina Bridge we verified was successful
+    bridge_url = f"https://r.jina.ai/{url}"
     try:
-        response = requests.get(proxy_url, timeout=30)
+        response = requests.get(bridge_url, timeout=30)
         if response.status_code == 200:
-            if not selector:
-                return float(response.json()['price'] / 100)
-            else:
-                # This part would use BeautifulSoup to find a specific price tag
-                from bs4 import BeautifulSoup
-                soup = BeautifulSoup(response.text, 'html.parser')
-                price_text = soup.select_one(selector).text
-                return float(''.join(c for c in price_text if c.isdigit() or c == '.'))
-        return f"Error {response.status_code}"
+            content = response.text
+            # Use Regex to find the price ($ followed by numbers)
+            match = re.search(r'\$\s?(\d+[\.,]\d{2})', content)
+            if match:
+                return float(match.group(1).replace(',', ''))
+            return "Price Not Found"
+        return f"Bridge Error {response.status_code}"
     except Exception as e:
         return "Connection Failed"
 
-# --- UI LOGIC ---
+# 3. UI LOGIC
+st.set_page_config(page_title="Pro Price Sniper", page_icon="🎯")
 st.title("🎯 Pro Price Sniper")
 
 with st.sidebar:
     st.header("🛡️ Backend Status")
-    if BOT_TOKEN and API_KEY:
-        st.success("Credentials Loaded Privately")
+    if BOT_TOKEN and CHAT_ID:
+        st.success("✅ Stealth Engine Active")
     else:
-        st.error("Missing .env keys!")
+        st.error("❌ Missing Secrets!")
+    st.info("Bypassing Anker/Cloudflare via Jina Bridge")
 
 # Add Section
-with st.expander("➕ Add New Tracker"):
-    name = st.text_input("Product Name")
+with st.expander("➕ Add New Tracker", expanded=True):
+    name = st.text_input("Product Name (e.g. Anker Power Bank)")
     url = st.text_input("URL")
-    # New: Optional selector for non-Shopify sites
-    selector = st.text_input("CSS Selector (Optional)", help="Leave blank for Anker/Shopify")
-    target = st.number_input("Target Price", value=0.0)
+    target = st.number_input("Target Price ($)", value=0.0)
     
-    if st.button("Add"):
-        db = json.load(open(DB_FILE)) if os.path.exists(DB_FILE) else []
-        db.append({"name": name, "url": url, "selector": selector, "target": target})
-        json.dump(db, open(DB_FILE, 'w'))
-        st.rerun()
+    if st.button("Add Product", use_container_width=True):
+        if name and url:
+            db = json.load(open(DB_FILE)) if os.path.exists(DB_FILE) else []
+            db.append({"name": name, "url": url, "target": target})
+            with open(DB_FILE, 'w') as f:
+                json.dump(db, f)
+            st.success(f"Added {name}!")
+            st.rerun()
 
-# Run Section
+st.divider()
+
+# List & Run Section
 if os.path.exists(DB_FILE):
     products = json.load(open(DB_FILE))
-    if st.button("🚀 RUN ALL SCANS", type="primary"):
+    st.subheader("📋 Active Monitors")
+    
+    if st.button("🚀 RUN ALL SCANS", type="primary", use_container_width=True):
         for p in products:
-            current = get_price(p['url'], p.get('selector'))
+            current = get_price(p['url'])
             if isinstance(current, float):
-                st.write(f"✅ {p['name']}: `${current}`")
-                # Telegram alert logic here...
+                st.write(f"✅ **{p['name']}**: `${current}` (Target: `${p['target']}`)")
+                if current <= p['target']:
+                    # Telegram Alert
+                    msg = f"🎯 PRICE DROP!\n{p['name']} is ${current}\nTarget: ${p['target']}\nLink: {p['url']}"
+                    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
+                                  json={"chat_id": CHAT_ID, "text": msg})
+                    st.toast("Telegram Alert Sent!")
             else:
                 st.error(f"❌ {p['name']}: {current}")
+    
+    # Simple Delete Option
+    if st.button("🗑️ Clear All Monitors", type="secondary"):
+        if os.path.exists(DB_FILE):
+            os.remove(DB_FILE)
+            st.rerun()
