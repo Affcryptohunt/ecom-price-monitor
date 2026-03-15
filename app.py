@@ -1,15 +1,18 @@
 import streamlit as st
 import os
-from dotenv import load_dotenv
 import requests
 import json
 
-load_dotenv()
+# Try to load local .env only if NOT running in the cloud
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass 
 
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
-API_KEY = os.getenv('SCRAPER_API_KEY')
-DB_FILE = 'monitor_list.json'
+# Streamlit handles the secrets automatically from the 'Settings' menu we discussed
+BOT_TOKEN = st.secrets.get("TELEGRAM_BOT_TOKEN") or os.getenv("TELEGRAM_BOT_TOKEN")
+CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
 
 def get_price(url, selector=None):
     # If no selector, assume it's a Shopify store and use the .js trick
