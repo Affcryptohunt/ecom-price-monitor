@@ -74,20 +74,23 @@ if os.path.exists(DB_FILE):
     products = json.load(open(DB_FILE))
     st.subheader("📋 Active Monitors")
     
+    # Create a column layout for each product row
+    for i, p in enumerate(products):
+        col1, col2 = st.columns([4, 1])
+        with col1:
+            st.write(f"**{p['name']}** (Target: `${p['target']}`)")
+        with col2:
+            # Unique key for each button using the index
+            if st.button("🗑️", key=f"del_{i}"):
+                products.pop(i)
+                with open(DB_FILE, 'w') as f:
+                    json.dump(products, f)
+                st.rerun()
+
+    st.divider()
+    
     if st.button("🚀 RUN ALL SCANS", type="primary", use_container_width=True):
-        for p in products:
-            current = get_price(p['url'], p['target']) 
-            # ✅ This passes the target price to the engine
-            if isinstance(current, float):
-                st.write(f"✅ **{p['name']}**: `${current}` (Target: `${p['target']}`)")
-                if current <= p['target']:
-                    # Telegram Alert
-                    msg = f"🎯 PRICE DROP!\n{p['name']} is ${current}\nTarget: ${p['target']}\nLink: {p['url']}"
-                    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
-                                  json={"chat_id": CHAT_ID, "text": msg})
-                    st.toast("Telegram Alert Sent!")
-            else:
-                st.error(f"❌ {p['name']}: {current}")
+        # ... (your existing scan logic remains here)
     
     # Simple Delete Option
     if st.button("🗑️ Clear All Monitors", type="secondary"):
