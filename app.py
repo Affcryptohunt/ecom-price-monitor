@@ -17,17 +17,24 @@ CHAT_ID = st.secrets.get("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_CHAT_ID")
 DB_FILE = 'monitor_list.json'
 
 # 2. THE ENGINE (Firewall Bypass)
-def get_price(url):
-    # Using the Jina Bridge we verified was successful
+def get_price(url, target_price):
     bridge_url = f"https://r.jina.ai/{url}"
     try:
         response = requests.get(bridge_url, timeout=30)
         if response.status_code == 200:
             content = response.text
-            # Use Regex to find the price ($ followed by numbers)
-            match = re.search(r'\$\s?(\d+[\.,]\d{2})', content)
-            if match:
-                return float(match.group(1).replace(',', ''))
+            # 1. Find every dollar amount on the page
+            matches = re.findall(r'\$\s?(\d+[\.,]\d{2})', content)
+            
+            if matches:
+                # 2. Convert them to numbers
+                prices = [float(p.replace(',', '')) for p in matches]
+                
+                # 3. SMART LOGIC: Pick the price closest to what you're looking for
+                # This ignores $15 cables and $2,000 "Sponsored" laptops
+                actual_price = min(prices, key=lambda x: abs(x - target_price))
+                return actual_price
+                
             return "Price Not Found"
         return f"Bridge Error {response.status_code}"
     except Exception as e:
@@ -69,7 +76,8 @@ if os.path.exists(DB_FILE):
     
     if st.button("🚀 RUN ALL SCANS", type="primary", use_container_width=True):
         for p in products:
-            current = get_price(p['url'])
+            current = get_price(p['url'], p['target']) 
+            # ✅ This passes the target price to the engine
             if isinstance(current, float):
                 st.write(f"✅ **{p['name']}**: `${current}` (Target: `${p['target']}`)")
                 if current <= p['target']:
