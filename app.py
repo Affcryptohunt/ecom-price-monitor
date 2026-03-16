@@ -24,29 +24,33 @@ def get_price(url, target_price):
         if response.status_code == 200:
             content = response.text
             
-            # 1. Clean the content - remove commas to avoid "1,299" becoming "1"
-            clean_content = content.replace(',', '')
-            
-            # 2. Find every dollar amount (e.g., $53.99, $5.99)
-            # This regex is specifically built for the Amazon 'superscript' format
-            matches = re.findall(r'\$\s?(\d+\.\d{2})', clean_content)
+            # 1. Surgical Cleaning: Amazon sometimes hides decimals
+            # This captures $53.99, $53 99, and even just $53
+            matches = re.findall(r'\$\s?(\d+[\s\.]?\d{0,2})', content)
             
             if matches:
-                # Convert to floats and remove duplicates
-                prices = list(set([float(p) for p in matches]))
+                prices = []
+                for p in matches:
+                    # Clean the string into a clean number
+                    clean_p = ''.join(c for c in p if c.isdigit() or c == '.')
+                    try:
+                        val = float(clean_p)
+                        # 2. THE SANITY FLOOR: 
+                        # Only keep prices that are at least 40% of your target.
+                        # This ignores $5.99 cables when you want a $60.00 case!
+                        if val > (target_price * 0.4):
+                            prices.append(val)
+                    except: continue
+
+                if prices:
+                    # 3. Pick the one closest to your target from the 'sane' list
+                    actual_price = min(prices, key=lambda x: abs(x - target_price))
+                    return actual_price
                 
-                # DEBUG: This will show up in your Streamlit 'Manage App' logs
-                print(f"DEBUG: Found these prices for {url}: {prices}")
-                
-                # 3. Pick the price closest to target
-                # If target is $60 and prices are [5.99, 53.99], it WILL pick 53.99
-                actual_price = min(prices, key=lambda x: abs(x - target_price))
-                return actual_price
-                
-            return "Price Not Found"
+            return "Main Price Not Found"
         return f"Bridge Error {response.status_code}"
     except Exception as e:
-        return f"Error: {str(e)}"
+        return f"Connection Failed"
 
 # 3. UI LOGIC
 st.set_page_config(page_title="Pro Price Sniper", page_icon="🎯")
