@@ -23,15 +23,16 @@ def get_price(url, target_price):
         response = requests.get(bridge_url, timeout=30)
         if response.status_code == 200:
             content = response.text
-            # 1. Find every dollar amount on the page
+            
+            # 1. Find every dollar amount on the page (including ones with decimals)
             matches = re.findall(r'\$\s?(\d+[\.,]\d{2})', content)
             
             if matches:
-                # 2. Convert them to numbers
+                # 2. Convert string prices like "53.99" to actual numbers
                 prices = [float(p.replace(',', '')) for p in matches]
                 
-                # 3. SMART LOGIC: Pick the price closest to what you're looking for
-                # This ignores $15 cables and $2,000 "Sponsored" laptops
+                # 3. THE SMART FILTER: Pick the price closest to your target
+                # This ignores $5.99 accessories when you're looking for a $50-60 item
                 actual_price = min(prices, key=lambda x: abs(x - target_price))
                 return actual_price
                 
