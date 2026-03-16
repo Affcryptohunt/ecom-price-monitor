@@ -24,22 +24,29 @@ def get_price(url, target_price):
         if response.status_code == 200:
             content = response.text
             
-            # 1. Find every dollar amount on the page (including ones with decimals)
-            matches = re.findall(r'\$\s?(\d+[\.,]\d{2})', content)
+            # 1. Clean the content - remove commas to avoid "1,299" becoming "1"
+            clean_content = content.replace(',', '')
+            
+            # 2. Find every dollar amount (e.g., $53.99, $5.99)
+            # This regex is specifically built for the Amazon 'superscript' format
+            matches = re.findall(r'\$\s?(\d+\.\d{2})', clean_content)
             
             if matches:
-                # 2. Convert string prices like "53.99" to actual numbers
-                prices = [float(p.replace(',', '')) for p in matches]
+                # Convert to floats and remove duplicates
+                prices = list(set([float(p) for p in matches]))
                 
-                # 3. THE SMART FILTER: Pick the price closest to your target
-                # This ignores $5.99 accessories when you're looking for a $50-60 item
+                # DEBUG: This will show up in your Streamlit 'Manage App' logs
+                print(f"DEBUG: Found these prices for {url}: {prices}")
+                
+                # 3. Pick the price closest to target
+                # If target is $60 and prices are [5.99, 53.99], it WILL pick 53.99
                 actual_price = min(prices, key=lambda x: abs(x - target_price))
                 return actual_price
                 
             return "Price Not Found"
         return f"Bridge Error {response.status_code}"
     except Exception as e:
-        return "Connection Failed"
+        return f"Error: {str(e)}"
 
 # 3. UI LOGIC
 st.set_page_config(page_title="Pro Price Sniper", page_icon="🎯")
