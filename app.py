@@ -22,35 +22,33 @@ def get_price(url, target_price):
     try:
         response = requests.get(bridge_url, timeout=30)
         if response.status_code == 200:
-            content = response.text
+            # We use .lower() to make searching easier
+            content = response.text.lower()
             
-            # 1. Surgical Cleaning: Amazon sometimes hides decimals
-            # This captures $53.99, $53 99, and even just $53
-            matches = re.findall(r'\$\s?(\d+[\s\.]?\d{0,2})', content)
+            # 1. Look for numbers that look like prices (e.g. 53.99 or 464.99)
+            # We don't even look for the '$' anymore because Amazon splits it in the code
+            matches = re.findall(r'(\d+\.\d{2})', content)
             
             if matches:
                 prices = []
                 for p in matches:
-                    # Clean the string into a clean number
-                    clean_p = ''.join(c for c in p if c.isdigit() or c == '.')
                     try:
-                        val = float(clean_p)
-                        # 2. THE SANITY FLOOR: 
-                        # Only keep prices that are at least 40% of your target.
-                        # This ignores $5.99 cables when you want a $60.00 case!
-                        if val > (target_price * 0.4):
+                        val = float(p)
+                        # 2. THE SANITY FLOOR (The most important part!)
+                        # Only accept prices that are between 30% and 300% of target
+                        # This kills the $5.99 accessories for a $400 camera
+                        if (target_price * 0.3) < val < (target_price * 3.0):
                             prices.append(val)
                     except: continue
 
                 if prices:
-                    # 3. Pick the one closest to your target from the 'sane' list
-                    actual_price = min(prices, key=lambda x: abs(x - target_price))
-                    return actual_price
+                    # 3. Pick the one closest to what we want
+                    return min(prices, key=lambda x: abs(x - target_price))
                 
             return "Main Price Not Found"
         return f"Bridge Error {response.status_code}"
-    except Exception as e:
-        return f"Connection Failed"
+    except Exception:
+        return "Connection Failed"
 
 # 3. UI LOGIC
 st.set_page_config(page_title="Pro Price Sniper", page_icon="🎯")
