@@ -23,7 +23,19 @@ try:
 except:
     BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+import requests
 
+if st.button("Test Telegram"):
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": "Test message from your bot 🚀"
+    }
+
+    r = requests.post(url, data=payload)
+
+    st.write(r.text)
 # =========================
 # PAGE CONFIG
 # =========================
@@ -216,3 +228,19 @@ if st.button("Find Deals"):
 
         for d in deals:
             st.success(f"{d['title']} → ${d['price']}")
+            st.markdown("---")
+
+if st.button("📩 Test Telegram"):
+
+    import requests
+
+    url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+
+    payload = {
+        "chat_id": CHAT_ID,
+        "text": "✅ Telegram is working!"
+    }
+
+    response = requests.post(url, data=payload)
+
+    st.write(response.text)
