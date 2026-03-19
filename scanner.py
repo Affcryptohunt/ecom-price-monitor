@@ -1,40 +1,102 @@
-import os
-import json
+from database import load_products
+from notifier import send_telegram_alert
+from database import save_price
 import requests
-from dotenv import load_dotenv
 import re
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
-load_dotenv()
-BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
-CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
-DB_FILE = 'monitor_list.json'
+# =========================
+# CONFIG
+# =========================
+MAX_WORKERS = 10
 
-def extract_price(text):
-    # Regex to find currency symbols followed by numbers (e.g., $29.99 or £15.00)
-    match = re.search(r'\$\s?(\d+[\.,]\d{2})', text)
-    if match:
-        return float(match.group(1).replace(',', ''))
-    return None
+# =========================
+# GET PRICE
+# =========================
+def get_price(url, target_price):
 
-def run_sniper():
-    if not os.path.exists(DB_FILE): return
-    with open(DB_FILE, 'r') as f:
-        products = json.load(f)
+    bridge_url = f"https://r.jina.ai/{url}"
 
-    for p in products:
-        # Route through the successful Jina Bridge
-        bridge_url = f"https://r.jina.ai/{p['url']}"
-        try:
-            res = requests.get(bridge_url, timeout=30)
-            if res.status_code == 200:
-                current_price = extract_price(res.text)
-                
-                if current_price and current_price <= p['target']:
-                    msg = f"🔥 **Sniper Alert!**\n\nProduct: {p['name']}\nTarget: ${p['target']}\n**Current: ${current_price}**\n\n[View Product]({p['url']})"
-                    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
-                                  json={"chat_id": CHAT_ID, "text": msg, "parse_mode": "Markdown"})
-        except Exception as e:
-            print(f"Error checking {p['name']}: {e}")
+    try:
+        response = requests.get(bridge_url, timeout=15)
 
-if __name__ == "__main__":
-    run_sniper()
+        if response.status_code != 200:
+            return None
+
+        content = response.text.lower()
+
+        matches = re.findall(r'(\d+\.\d{2})', content)
+
+        prices = []
+
+        for p in matches:
+            try:
+                val = float(p)
+
+                if (target_price * 0.3) < val < (target_price * 3.0):
+                    prices.append(val)
+
+            except:
+                continue
+
+        if not prices:
+            return None
+
+        return min(prices, key=lambda x: abs(x - target_price))
+
+    except:
+        return None
+
+
+# =========================
+# SCAN ONE PRODUCT
+# =========================
+def scan_product(product):
+
+    price = get_price(product["url"], product["target"])
+
+    # SAVE PRICE IF VALID
+    if isinstance(price, float):
+        save_price(product["id"], price)
+
+    result = {
+        "name": product["name"],
+        "price": price,
+        "target": product["target"],
+        "url": product["url"]
+    }
+
+    return result
+
+
+# =========================
+# SCAN ALL PRODUCTS (PARALLEL)
+# =========================
+def scan_all_products():
+
+    products = load_products()
+
+    results = []
+
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+
+        futures = [executor.submit(scan_product, p) for p in products]
+
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+
+            # =========================
+            # ALERT LOGIC
+            # =========================
+            if isinstance(result["price"], float):
+
+                if result["price"] <= result["target"]:
+
+                    send_telegram_alert(
+                        result["name"],
+                        result["price"],
+                        result["url"]
+                    )
+
+    return results

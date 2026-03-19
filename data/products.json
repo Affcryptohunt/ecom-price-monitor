@@ -1,14 +1,14 @@
 [
   {
     "id": 1,
-    "name": "ada",
-    "url": "https://www.anker.com/products/a110a-anker-prime-26k-300w-power-bank?variant=45569647542422&ref=notFound",
-    "target": 250.0
+    "name": "ASUS ROG Strix G16 (2025) Gaming Laptop, 16\u201d FHD+ 16:10 165Hz/3ms Display, NVIDIA\u00ae GeForce RTX\u2122 5060 Laptop GPU, Intel\u00ae Core\u2122 i7 Processor 14650HX, 16GB DDR5, 1TB Gen 4 SSD, Wi-Fi 7, Windows 11 Home",
+    "url": "https://www.amazon.com/ASUS-ROG-Strix-Gaming-Laptop/dp/B0DZZWMB2L/ref=sr_1_2?_encoding=UTF8&sr=8-2",
+    "target": 1300.0
   },
   {
     "id": 2,
-    "name": "test",
-    "url": "https://www.anker.com/products/a1653-anker-nano-power-bank-22-5w-built-in-usb-c-connector",
-    "target": 100.0
+    "name": "LEVOIT Tower Fan for Bedroom, Standing Fan with 28dB Quiet for Sleep, Remoter, 12H Timer, 25ft/s Velocity, 5 Speeds, 4 Modes, 90\u00b0 Oscillation for Home, Office, Indoor, Bladeless 36 inch, White",
+    "url": "https://www.amazon.com/LEVOIT-Velocity-Bladeless-Oscillating-Standing/dp/B0BVZFQ4DF",
+    "target": 56.0
   }
 ]

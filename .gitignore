@@ -1,9 +1,15 @@
-# Local environment variables
+# Secrets
 .env
 
-# Python cache
+# Python folders
 __pycache__/
+.venv/
+env/
+venv/
 *.py[cod]
 
-# Streamlit local config
+# Streamlit
 .streamlit/
+
+# OS specific
+.DS_Store
